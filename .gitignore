@@ -1,0 +1,36 @@
+.env
+__pycache__/
+*.pyc
+chroma_db/
+.venv/
+venv/
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+dist/
+build/
+
+# Node / React
+node_modules/
+dist/
+.vite/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
