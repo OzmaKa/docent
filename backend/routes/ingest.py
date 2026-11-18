@@ -4,6 +4,7 @@ from services.ingest_service import ingest_url, ingest_file
 
 router = APIRouter()
 
+
 @router.post("/url", response_model=IngestResponse)
 async def ingest_url_endpoint(request: IngestURLRequest):
     try:
@@ -14,8 +15,12 @@ async def ingest_url_endpoint(request: IngestURLRequest):
             chunk_count=chunk_count,
             message=f"Successfully ingested {chunk_count} chunks from {request.url}"
         )
+    except ValueError as e:
+        # user-caused errors (bad URL, unsupported file type) -> 400, not 500
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/file", response_model=IngestResponse)
 async def ingest_file_endpoint(
@@ -32,5 +37,7 @@ async def ingest_file_endpoint(
             chunk_count=chunk_count,
             message=f"Successfully ingested {chunk_count} chunks from {file.filename}"
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
