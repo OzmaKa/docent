@@ -13,6 +13,13 @@ from pinecone import Pinecone, ServerlessSpec
 _OWNER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 _REPO_RE = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 
+MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
+_ALLOWED_TYPES = {
+    ".pdf": ["application/pdf"],
+    ".txt": ["text/plain"],
+    ".md": ["text/markdown", "text/plain"],
+}
+
 
 def get_pinecone_index():
     pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
@@ -90,20 +97,41 @@ async def ingest_url(url: str, name: str) -> int:
     return store_in_pinecone(docs, namespace=name)
 
 
-async def ingest_file(file, name: str) -> int:
-    content = await file.read()
+def _validate_file_type(filename: str | None, content_type: str | None) -> str:
+    """Return the file extension if both extension and content_type are allowed."""
+    ext = os.path.splitext((filename or "").lower())[1]
+    if ext not in _ALLOWED_TYPES:
+        raise ValueError("Unsupported file type. Allowed: .pdf, .txt, .md")
+    if content_type not in _ALLOWED_TYPES[ext]:
+        raise ValueError(f"File content type '{content_type}' does not match '{ext}'")
+    return ext
 
-    if file.content_type == "application/pdf":
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-        text = "\n".join([
-            page.extract_text()
-            for page in pdf_reader.pages
-            if page.extract_text()
-        ])
-    elif file.content_type in ["text/plain", "text/markdown"]:
-        text = content.decode("utf-8")
+
+def _extract_pdf_text(content: bytes) -> str:
+    try:
+        reader = PyPDF2.PdfReader(io.BytesIO(content))
+        pages = [page.extract_text() for page in reader.pages]
+    except Exception:
+        # corrupted / encrypted / malformed PDF -> a user error, not a server bug
+        raise ValueError("Could not read this PDF. It may be corrupted or encrypted.")
+    return "\n".join(p for p in pages if p)
+
+
+async def ingest_file(file, name: str) -> int:
+    ext = _validate_file_type(file.filename, file.content_type)
+
+    # read at most MAX+1 bytes: if we get more than MAX, the file is too big
+    content = await file.read(MAX_FILE_BYTES + 1)
+    if len(content) > MAX_FILE_BYTES:
+        raise ValueError(f"File too large. Maximum size is {MAX_FILE_BYTES // (1024 * 1024)} MB")
+
+    if ext == ".pdf":
+        text = _extract_pdf_text(content)
     else:
-        raise ValueError(f"Unsupported file type: {file.content_type}")
+        text = content.decode("utf-8")  # UnicodeDecodeError is a ValueError -> 400
+
+    if not text.strip():
+        raise ValueError("No readable text found in this file")
 
     docs = chunk_text(text)
     return store_in_pinecone(docs, namespace=name)
