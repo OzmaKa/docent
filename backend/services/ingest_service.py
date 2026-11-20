@@ -13,6 +13,11 @@ from pinecone import Pinecone, ServerlessSpec
 _OWNER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 _REPO_RE = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 
+# Pinecone namespaces must be ASCII. TEMPORARY rule until namespaces become
+# server-generated IDs (user-facing names will then be stored separately).
+# The 64-char cap is a conservative choice of ours, not a documented Pinecone limit.
+_SOURCE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$")
+
 MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 _ALLOWED_TYPES = {
     ".pdf": ["application/pdf"],
@@ -56,6 +61,16 @@ def store_in_pinecone(docs: list[Document], namespace: str) -> int:
     return len(docs)
 
 
+def validate_source_name(name: str) -> None:
+    """Reject names Pinecone can't accept, with a clear message (-> HTTP 400)."""
+    if not _SOURCE_NAME_RE.match(name or ""):
+        raise ValueError(
+            "Source name must use English letters, numbers, spaces, '-', '_' or '.', "
+            "start with a letter or number, and be at most 64 characters. "
+            "Non-English names are not supported yet."
+        )
+
+
 def parse_github_repo_url(url: str) -> tuple[str, str]:
     """Validate a GitHub repo URL and return (owner, repo).
 
@@ -84,6 +99,7 @@ def parse_github_repo_url(url: str) -> tuple[str, str]:
 
 
 async def ingest_url(url: str, name: str) -> int:
+    validate_source_name(name)
     owner, repo = parse_github_repo_url(url)
     raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/README.md"
 
@@ -118,6 +134,7 @@ def _extract_pdf_text(content: bytes) -> str:
 
 
 async def ingest_file(file, name: str) -> int:
+    validate_source_name(name)
     ext = _validate_file_type(file.filename, file.content_type)
 
     # read at most MAX+1 bytes: if we get more than MAX, the file is too big
