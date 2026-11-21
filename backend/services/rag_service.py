@@ -2,8 +2,14 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from services.llm_factory import get_llm, get_embeddings
+import logging
 import os
 import json
+
+logger = logging.getLogger(__name__)
+
+RATE_LIMIT_MSG = "This provider hit its rate limit. Try again in a few seconds or switch providers."
+GENERIC_ERROR_MSG = "Something went wrong while processing your question. Please try again."
 
 
 def _normalize_answer(raw_answer):
@@ -16,6 +22,10 @@ def _normalize_answer(raw_answer):
             for block in raw_answer
         ])
     return raw_answer
+
+
+def _is_rate_limit(err: str) -> bool:
+    return "RESOURCE_EXHAUSTED" in err or "429" in err
 
 
 def _build_agent(namespace: str, provider: str, model: str):
@@ -62,19 +72,14 @@ async def query_documents(
     provider: str = None,
     model: str = None
 ) -> dict:
-    agent, sources = _build_agent(namespace, provider, model)
-
     try:
+        agent, sources = _build_agent(namespace, provider, model)
         result = agent.invoke({"messages": [("human", question)]})
         answer = _normalize_answer(result["messages"][-1].content)
     except Exception as e:
-        err = str(e)
-        if "RESOURCE_EXHAUSTED" in err or "429" in err:
-            return {
-                "answer": "This provider hit its rate limit. Try again in a few seconds or switch providers.",
-                "sources": []
-            }
-        raise
+        if _is_rate_limit(str(e)):
+            return {"answer": RATE_LIMIT_MSG, "sources": []}
+        raise  # the route logs it and returns a generic message
 
     return {
         "answer": answer,
@@ -98,17 +103,17 @@ async def stream_query_documents(
     provider: str = None,
     model: str = None
 ):
-    agent, sources = _build_agent(namespace, provider, model)
-
     try:
+        agent, sources = _build_agent(namespace, provider, model)
         result = agent.invoke({"messages": [("human", question)]})
         answer = _normalize_answer(result["messages"][-1].content)
     except Exception as e:
-        err = str(e)
-        if "RESOURCE_EXHAUSTED" in err or "429" in err:
-            msg = "This provider hit its rate limit. Try again in a few seconds or switch providers."
+        if _is_rate_limit(str(e)):
+            msg = RATE_LIMIT_MSG
         else:
-            msg = f"Error: {err}"
+            # full traceback to the server logs, generic message to the client
+            logger.exception("Unexpected error in /query/stream")
+            msg = GENERIC_ERROR_MSG
         yield f"data: {json.dumps({'type': 'error', 'content': msg})}\n\n"
         return
 

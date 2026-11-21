@@ -1,9 +1,14 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from schemas.models import QueryRequest, QueryResponse
 from services.rag_service import query_documents, stream_query_documents
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+GENERIC_ERROR = "Something went wrong while processing your question. Please try again."
 
 # ── Non-streaming endpoint — kept for simple integrations / testing ──────────
 @router.post("/query", response_model=QueryResponse)
@@ -19,9 +24,10 @@ async def query_endpoint(request: QueryRequest):
             answer=result["answer"],
             sources=result["sources"]
         )
-    except Exception as e:
-        print(f"QUERY ERROR: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        # full traceback goes to the server logs, the client gets a generic message
+        logger.exception("Unexpected error in /query/query")
+        raise HTTPException(status_code=500, detail=GENERIC_ERROR)
 
 
 # ── Streaming endpoint — SSE, used by the chat UI ─────────────────────────────
