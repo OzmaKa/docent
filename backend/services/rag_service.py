@@ -2,6 +2,7 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from services.llm_factory import get_llm, get_embeddings
+import asyncio
 import logging
 import os
 import json
@@ -65,6 +66,16 @@ def _build_agent(namespace: str, provider: str, model: str):
     return agent, sources
 
 
+def _run_agent(question: str, namespace: str, provider: str, model: str):
+    """BLOCKING: builds the agent and runs it to completion (network calls to
+    Pinecone, Cohere and the LLM). Never call this directly from async code:
+    use asyncio.to_thread so the event loop stays free for other requests."""
+    agent, sources = _build_agent(namespace, provider, model)
+    result = agent.invoke({"messages": [("human", question)]})
+    answer = _normalize_answer(result["messages"][-1].content)
+    return answer, sources
+
+
 # ── Non-streaming version — used as fallback / by /query/query ───────────────
 async def query_documents(
     question: str,
@@ -73,9 +84,9 @@ async def query_documents(
     model: str = None
 ) -> dict:
     try:
-        agent, sources = _build_agent(namespace, provider, model)
-        result = agent.invoke({"messages": [("human", question)]})
-        answer = _normalize_answer(result["messages"][-1].content)
+        answer, sources = await asyncio.to_thread(
+            _run_agent, question, namespace, provider, model
+        )
     except Exception as e:
         if _is_rate_limit(str(e)):
             return {"answer": RATE_LIMIT_MSG, "sources": []}
@@ -104,9 +115,9 @@ async def stream_query_documents(
     model: str = None
 ):
     try:
-        agent, sources = _build_agent(namespace, provider, model)
-        result = agent.invoke({"messages": [("human", question)]})
-        answer = _normalize_answer(result["messages"][-1].content)
+        answer, sources = await asyncio.to_thread(
+            _run_agent, question, namespace, provider, model
+        )
     except Exception as e:
         if _is_rate_limit(str(e)):
             msg = RATE_LIMIT_MSG

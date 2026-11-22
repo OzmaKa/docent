@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import PyPDF2
 import io
@@ -50,6 +51,8 @@ def chunk_text(text: str) -> list[Document]:
 
 
 def store_in_pinecone(docs: list[Document], namespace: str) -> int:
+    """BLOCKING (embeddings + Pinecone network calls). From async code, call it
+    through asyncio.to_thread so the event loop stays free."""
     embeddings = get_embeddings()
     vectorstore = PineconeVectorStore(
         index_name="doc-assistant",
@@ -110,7 +113,7 @@ async def ingest_url(url: str, name: str) -> int:
         raise ValueError(f"Could not fetch README from {owner}/{repo} (branch: main)")
 
     docs = chunk_text(response.text)
-    return store_in_pinecone(docs, namespace=name)
+    return await asyncio.to_thread(store_in_pinecone, docs, name)
 
 
 def _validate_file_type(filename: str | None, content_type: str | None) -> str:
@@ -124,6 +127,7 @@ def _validate_file_type(filename: str | None, content_type: str | None) -> str:
 
 
 def _extract_pdf_text(content: bytes) -> str:
+    """BLOCKING and CPU-bound: parsing a large PDF can take seconds."""
     try:
         reader = PyPDF2.PdfReader(io.BytesIO(content))
         pages = [page.extract_text() for page in reader.pages]
@@ -143,7 +147,7 @@ async def ingest_file(file, name: str) -> int:
         raise ValueError(f"File too large. Maximum size is {MAX_FILE_BYTES // (1024 * 1024)} MB")
 
     if ext == ".pdf":
-        text = _extract_pdf_text(content)
+        text = await asyncio.to_thread(_extract_pdf_text, content)
     else:
         text = content.decode("utf-8")  # UnicodeDecodeError is a ValueError -> 400
 
@@ -151,4 +155,4 @@ async def ingest_file(file, name: str) -> int:
         raise ValueError("No readable text found in this file")
 
     docs = chunk_text(text)
-    return store_in_pinecone(docs, namespace=name)
+    return await asyncio.to_thread(store_in_pinecone, docs, name)
