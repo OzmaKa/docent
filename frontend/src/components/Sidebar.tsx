@@ -7,9 +7,10 @@ interface SidebarProps {
   activeNamespace: string | null;
   onSelectSource: (name: string) => void;
   onIngestSuccess: (name: string, type: "url" | "file") => void;
+  isOpen: boolean;
 }
 
-export function Sidebar({ sources, activeNamespace, onSelectSource, onIngestSuccess }: SidebarProps) {
+export function Sidebar({ sources, activeNamespace, onSelectSource, onIngestSuccess, isOpen }: SidebarProps) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +52,17 @@ export function Sidebar({ sources, activeNamespace, onSelectSource, onIngestSucc
   };
 
   return (
-    <aside className="w-[300px] shrink-0 border-r border-white/[0.06] flex flex-col bg-[#0f1117]">
-      {/* Ingest section */}
+    <aside className={`
+      fixed md:static inset-y-0 left-0 z-30
+      w-[280px] md:w-[300px] shrink-0
+      border-r border-white/[0.06] flex flex-col bg-[#0f1117]
+      transition-transform duration-200 ease-in-out
+      ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      top-12 md:top-0
+    `}>
       <div className="p-4 border-b border-white/[0.06]">
         <p className="text-[11px] font-medium text-white/30 uppercase tracking-widest mb-3">Add a source</p>
 
-        {/* URL input */}
         <div className="relative mb-2">
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -99,7 +105,6 @@ export function Sidebar({ sources, activeNamespace, onSelectSource, onIngestSucc
           <div className="flex-1 h-px bg-white/[0.06]" />
         </div>
 
-        {/* File upload */}
         <input ref={fileRef} type="file" accept=".pdf,.txt,.md" onChange={handleFileUpload} className="hidden" />
         <button
           onClick={() => fileRef.current?.click()}
@@ -118,7 +123,6 @@ export function Sidebar({ sources, activeNamespace, onSelectSource, onIngestSucc
         {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
       </div>
 
-      {/* Sources list */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] font-medium text-white/30 uppercase tracking-widest">Sources</p>

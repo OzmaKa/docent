@@ -1,4 +1,3 @@
-// ─── src/components/ChatPanel.tsx ────────────────────────────────────────────
 import { useState, useRef, useEffect } from "react";
 import { streamQueryDocs } from "../api/query";
 
@@ -128,12 +127,12 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden">
-      <div className="h-12 border-b border-white/[0.06] flex items-center justify-between px-5 shrink-0">
+      <div className="h-12 border-b border-white/[0.06] flex items-center justify-between px-4 sm:px-5 shrink-0">
         <div className="flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" opacity="0.4">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          <span className="text-sm text-white/50">Ask about your docs</span>
+          <span className="text-sm text-white/50 hidden sm:block">Ask about your docs</span>
         </div>
 
         <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
@@ -141,7 +140,7 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
             <button
               key={p.id}
               onClick={() => setProvider(p.id)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                 provider === p.id
                   ? "bg-emerald-600 text-white"
                   : "text-white/40 hover:text-white/70"
@@ -153,9 +152,9 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-6">
         {!namespace ? (
-          <div className="h-full flex flex-col items-center justify-center gap-4">
+          <div className="h-full flex flex-col items-center justify-center gap-4 px-4">
             <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5">
                 <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -191,8 +190,8 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
                   {msg.role === "user" ? "U" : "AI"}
                 </div>
 
-                <div className={`flex-1 ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
-                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[85%] whitespace-pre-wrap ${
+                <div className={`flex-1 min-w-0 ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
+                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[90%] sm:max-w-[85%] whitespace-pre-wrap break-words ${
                     msg.role === "user"
                       ? "bg-blue-600 text-white rounded-tr-sm"
                       : "bg-white/[0.04] border border-white/[0.06] text-white/85 rounded-tl-sm"
@@ -206,7 +205,6 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
                     ) : null)}
                   </div>
 
-                  {/* Sources — collapsed by default */}
                   {msg.sources && msg.sources.length > 0 && (
                     <SourcesToggle sources={msg.sources} />
                   )}
@@ -220,14 +218,14 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
       </div>
 
       {error && (
-        <div className="px-6 pb-2">
+        <div className="px-3 sm:px-6 pb-2">
           <p className="text-red-400/80 text-xs text-center">{error}</p>
         </div>
       )}
 
-      <div className="px-6 pb-5 pt-3 border-t border-white/[0.06]">
+      <div className="px-3 sm:px-6 pb-5 pt-3 border-t border-white/[0.06]">
         <div className="max-w-3xl mx-auto">
-          <div className={`flex gap-3 items-end bg-white/[0.04] border rounded-2xl px-4 py-3 transition-colors ${
+          <div className={`flex gap-2 sm:gap-3 items-end bg-white/[0.04] border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 transition-colors ${
             namespace ? "border-white/[0.08] focus-within:border-white/20" : "border-white/[0.04] opacity-50"
           }`}>
             <textarea
@@ -238,7 +236,7 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
               disabled={!namespace || loading}
               placeholder={namespace ? "Ask a question..." : "Add a source first..."}
               rows={1}
-              className="flex-1 bg-transparent text-sm text-white placeholder-white/20 resize-none focus:outline-none leading-relaxed"
+              className="flex-1 bg-transparent text-sm text-white placeholder-white/20 resize-none focus:outline-none leading-relaxed min-w-0"
               style={{ maxHeight: "160px" }}
             />
             <button
@@ -252,7 +250,7 @@ export function ChatPanel({ namespace }: ChatPanelProps) {
               </svg>
             </button>
           </div>
-          <p className="text-center text-[11px] text-white/15 mt-2">Press Enter to send · Shift+Enter for a new line</p>
+          <p className="text-center text-[11px] text-white/15 mt-2 hidden sm:block">Press Enter to send · Shift+Enter for a new line</p>
         </div>
       </div>
     </main>
